@@ -4,6 +4,7 @@ import asyncio
 import uuid
 import time
 from typing import List, Dict, Any
+from order_actions import get_price_list
 
 # Пользовательская дата для работы с другими периодами при отметке
 user_date = "2024-12-10"
@@ -90,9 +91,10 @@ async def generate_order_send_kitchen(table: int) -> None:
 
         await asyncio.gather(*tasks)
 
-    end_time = time.time()
-    elapsed_time = round((end_time - start_time), 2)
-    print(f"{count} заказ(ов) созданы и отправлены на кухню за {elapsed_time} сек.")
+    # end_time = time.time()
+    # elapsed_time = round((end_time - start_time), 2)
+    # print(f"{count} заказ(ов) созданы и отправлены на кухню за {elapsed_time} сек.")
+    print(f"{count} заказ(ов) созданы и отправлены на кухню")
 
     answer = int(input("\n1. Продолжить работу\n"
                        "2. Закончить\n"
@@ -145,7 +147,7 @@ async def create_and_send_order(client: httpx.AsyncClient, table: int, index: in
     sale_response.raise_for_status()
     sale_data = sale_response.json()
     sale = sale_data['result']['d'][0]
-    sale_list.append(sale)
+    # sale_list.append(sale)
 
     # Добавление номенклатуры
     add_response = await client.post(
@@ -161,7 +163,8 @@ async def create_and_send_order(client: httpx.AsyncClient, table: int, index: in
                     "pay_type": 0,
                     "skip_calories": True
                 },
-                "Sale": sale_list[index],
+                # "Sale": sale_list[index],
+                "Sale": sale,
                 "Batch": {
                     "d": [
                         [
@@ -199,7 +202,7 @@ async def create_and_send_order(client: httpx.AsyncClient, table: int, index: in
     add_response.raise_for_status()
     add_data = add_response.json()
     sale_order = add_data["result"]["d"][0][1]
-    sale_nom_list.append(sale_order)
+    # sale_nom_list.append(sale_order)
 
     # Отправка на кухню
     await client.post(
@@ -217,10 +220,10 @@ async def create_and_send_order(client: httpx.AsyncClient, table: int, index: in
                         {
                             "d": [
                                 [
-                                    sale_nom_list[index],
+                                    sale_order,
                                     None,
                                     None,
-                                    sale_list[index],
+                                    sale,
                                     0
                                 ]
                             ],

@@ -27,6 +27,6 @@ workplace = 22
 product = 2
 
 # SaleNomenclature.AddBatch
-Nomenclature = 161
+Nomenclature = 159
 Quantity = 10
 CatalogPrice = 60

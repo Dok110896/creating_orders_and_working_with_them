@@ -113,12 +113,13 @@ async def delete_order(sale_id):
 
 
 async def delete_order_table(sale_table):
-    start_time = time.time()
+    # start_time = time.time()
     async with httpx.AsyncClient(headers=header) as client:
         tasks = [delete_order(sale_id) for sale_id in sale_table]
         await asyncio.gather(*tasks)
-    end_time = time.time()
-    print(f"Все заказы удалены за {round((end_time - start_time), 2)} сек.\n")
+    # end_time = time.time()
+    # print(f"Все заказы удалены за {round((end_time - start_time), 2)} сек.\n")
+    print(f"Все заказы удалены.\n")
 
 
 async def delete_tables():
