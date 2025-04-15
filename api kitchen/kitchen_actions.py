@@ -1,8 +1,8 @@
-from datetime import datetime, time
-
+from datetime import datetime
 from auth import *
 from order_actions import delete_tables
 from user_settings import *
+import time
 
 pnq_list = []
 
@@ -18,7 +18,7 @@ async def async_post(client, json_data):
 
 
 async def set_pnq_state(state):
-    # start_time = time.time()
+    start_time = time.time()
     async with httpx.AsyncClient(headers=header) as client:
         tasks = []
         for pnq in pnq_list:
@@ -44,15 +44,14 @@ async def set_pnq_state(state):
 
         await asyncio.gather(*tasks)
 
-    # end_time = time.time()
-    # elapsed_time = round((end_time - start_time), 2)
+    end_time = time.time()
+    elapsed_time = round((end_time - start_time), 2)
     state_name = {
         10: "готовыми",
         15: "поданы",
         5: "в работу"
     }.get(state, "")
-    # print(f"Все заказы отмечены {state_name} за {elapsed_time} сек.")
-    print(f"Все заказы отмечены {state_name} ")
+    print(f"Все заказы отмечены {state_name} за {elapsed_time} сек.")
 
 
 async def check_ready():
@@ -104,49 +103,21 @@ async def verify_empty_kitchen():
     async with httpx.AsyncClient(headers=header) as client:
         response = await async_post(client, data)
         if response:
-            av = [row[16] for row in response['result']['d']]
+            av = [row[18] for row in response['result']['d']]
             assert len(av) == 0, "На кухне остались блюда"
 
 
 async def get_pnq_list():
-    current_date = "2025-04-15"  # Фиксированная дата для тестирования
-    # data = {
-    #     "jsonrpc": "2.0",
-    #     "protocol": 6,
-    #     "method": "Kitchen.TaskList",
-    #     "params": {
-    #         "Фильтр": {
-    #             "d": [False, Company, True, "in_work",
-    #                   [current_date, current_date],
-    #                   [None], None, True, [0, 5, 10], [Warehouse]],
-    #             "s": [
-    #                 {"t": "Логическое", "n": "ByNomenclature"},
-    #                 {"t": "Число целое", "n": "Company"},
-    #                 {"t": "Логическое", "n": "IsOnline"},
-    #                 {"t": "Строка", "n": "Mode"},
-    #                 {"t": {"n": "Массив", "t": "Дата"}, "n": "Period"},
-    #                 {"t": {"n": "Массив", "t": "Строка"}, "n": "ProductionSites"},
-    #                 {"t": "Строка", "n": "Search"},
-    #                 {"t": "Логическое", "n": "ShowDelivery"},
-    #                 {"t": {"n": "Массив", "t": "Число целое"}, "n": "States"},
-    #                 {"t": {"n": "Массив", "t": "Число целое"}, "n": "Warehouses"}
-    #             ],
-    #             "_type": "record",
-    #             "f": 0
-    #         },
-    #         "Сортировка": {"d": [[False, "Started", True]]},
-    #         "Навигация": {"d": [True, 999, 0]},
-    #         "ДопПоля": []
-    #     },
-    #     "id": 1
-    # }
+    # current_time = "2025-04-15"   # Фиксированная дата для действий с другим днем
+    current_date = datetime.now().date()
+
     data = {
         "jsonrpc": "2.0",
-        "protocol": 7,
+        "protocol": 6,
         "method": "Kitchen.TaskList",
         "params": {
             "Фильтр": {
-                "d": [True, 3395, True, "ready", ["2025-04-15", "2025-04-15"], [None], True, [15], [3397]],
+                "d": [False, Company, True, "in_work", [str(current_date), str(current_date)], [None], None, True, [0, 5, 10], [Warehouse]],
                 "s": [
                     {"t": "Логическое", "n": "ByNomenclature"},
                     {"t": "Число целое", "n": "Company"},
@@ -154,6 +125,7 @@ async def get_pnq_list():
                     {"t": "Строка", "n": "Mode"},
                     {"t": {"n": "Массив", "t": "Дата"}, "n": "Period"},
                     {"t": {"n": "Массив", "t": "Строка"}, "n": "ProductionSites"},
+                    {"t": "Строка", "n": "Search"},
                     {"t": "Логическое", "n": "ShowDelivery"},
                     {"t": {"n": "Массив", "t": "Число целое"}, "n": "States"},
                     {"t": {"n": "Массив", "t": "Число целое"}, "n": "Warehouses"}
@@ -172,12 +144,11 @@ async def get_pnq_list():
                 "f": 0
             },
             "Навигация": {
-                "d": ["forward", True, 999, None],
+                "d": [True, 999, 0],
                 "s": [
-                    {"t": "Строка", "n": "Direction"},
-                    {"t": "Логическое", "n": "HasMore"},
-                    {"t": "Число целое", "n": "Limit"},
-                    {"t": "Строка", "n": "Position"}
+                    {"t": "Логическое", "n": "ЕстьЕще"},
+                    {"t": "Число целое", "n": "РазмерСтраницы"},
+                    {"t": "Число целое", "n": "Страница"}
                 ],
                 "_type": "record",
                 "f": 0
@@ -185,7 +156,7 @@ async def get_pnq_list():
             "ДопПоля": []
         },
         "id": 1
-    }
+        }
 
     async with httpx.AsyncClient(headers=header) as client:
         try:
@@ -206,15 +177,11 @@ async def get_pnq_list():
                 print("Ответ не содержит ключа 'result'")
                 return []
 
-            # result_data = response['result']
+            result_data = response['result']
 
-            # if 'd' not in result_data:
-            #     print("Ответ не содержит данных в 'd'")
-            #     return []
-
-            # Обрабатываем данные
-            global pnq_list
-            pnq_list = []
+            if 'd' not in result_data:
+                print("Ответ не содержит данных в 'd'")
+                return []
 
             for row in response['result']['d']:
                 try:

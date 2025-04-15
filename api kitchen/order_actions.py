@@ -2,7 +2,15 @@ import asyncio
 import httpx
 from auth import *
 from user_settings import *
-from datetime import datetime, time
+from datetime import datetime
+import time
+from tenacity import retry, stop_after_attempt, wait_exponential
+
+
+MAX_CONCURRENT_DELETES = 90  # Лимит одновременных удалений в одной очереди
+DELETE_TIMEOUT = 30.0  # Таймаут для каждого запроса
+RETRY_ATTEMPTS = 3  # Количество попыток повтора
+QUEUE_DELAY = 2  # Задержка между очередями в секундах
 
 
 async def async_post(client, json_data):
@@ -85,41 +93,88 @@ async def sale_list_table(table):
     return []
 
 
-async def delete_order(sale_id):
-    cancel_data = {
-        "jsonrpc": "2.0",
-        "protocol": 6,
-        "method": "Sale.Cancel",
-        "params": {
-            "Sale": sale_id,
-            "RefusalReason": 5,
-            "Workplace": None,
-            "AuthInfo": None,
-            "Params": {
-                "d": [True],
-                "s": [{"t": "Логическое", "n": "CheckUnfinishedTasks"}],
-                "_type": "record",
-                "f": 0
-            }
-        },
-        "id": 1
-    }
+@retry(
+    stop=stop_after_attempt(RETRY_ATTEMPTS),
+    wait=wait_exponential(multiplier=1, min=4, max=10)
+)
+async def delete_order(client: httpx.AsyncClient, sale_id: int, index: int = None) -> None:
+    try:
+        cancel_data = {
+            "jsonrpc": "2.0",
+            "protocol": 6,
+            "method": "Sale.Cancel",
+            "params": {
+                "Sale": sale_id,
+                "RefusalReason": 5,
+                "Workplace": None,
+                "AuthInfo": None,
+                "Params": {
+                    "d": [True],
+                    "s": [{"t": "Логическое", "n": "CheckUnfinishedTasks"}],
+                    "_type": "record",
+                    "f": 0
+                }
+            },
+            "id": 1
+        }
 
-    async with httpx.AsyncClient(headers=header) as client:
-        await asyncio.gather(
-            async_post(client, cancel_data),
-            async_post(client, {**cancel_data, "params": {**cancel_data["params"], "RefusalReason": None}})
+        # Отправляем оба варианта запроса (с RefusalReason и без)
+        responses = await asyncio.gather(
+            client.post(standEndpoint, json=cancel_data, headers=header, timeout=DELETE_TIMEOUT),
+            client.post(standEndpoint,
+                        json={**cancel_data, "params": {**cancel_data["params"], "RefusalReason": None}},
+                        headers=header,
+                        timeout=DELETE_TIMEOUT)
         )
 
+        for response in responses:
+            response.raise_for_status()
 
-async def delete_order_table(sale_table):
-    # start_time = time.time()
-    async with httpx.AsyncClient(headers=header) as client:
-        tasks = [delete_order(sale_id) for sale_id in sale_table]
-        await asyncio.gather(*tasks)
-    # end_time = time.time()
-    # print(f"Все заказы удалены за {round((end_time - start_time), 2)} сек.\n")
-    print(f"Все заказы удалены.\n")
+        if index is not None:
+            print(f"Заказ {index + 1} (ID: {sale_id}) успешно удален")
+    except Exception as e:
+        print(f"Ошибка при удалении заказа {f'{index + 1} ' if index is not None else ''}(ID: {sale_id}): {str(e)}")
+        raise
+
+
+async def delete_order_table(sale_ids: list) -> None:
+    start_time = time.time()
+
+    # Создаем клиент с настройками пула соединений
+    async with httpx.AsyncClient(
+            limits=httpx.Limits(
+                max_connections=MAX_CONCURRENT_DELETES,
+                max_keepalive_connections=50,
+                keepalive_expiry=60
+            ),
+            timeout=httpx.Timeout(DELETE_TIMEOUT)
+    ) as client:
+        # Разбиваем все заказы на очереди
+        total_queues = (len(sale_ids) + MAX_CONCURRENT_DELETES - 1) // MAX_CONCURRENT_DELETES
+
+        for queue_num in range(total_queues):
+            start_index = queue_num * MAX_CONCURRENT_DELETES
+            end_index = min((queue_num + 1) * MAX_CONCURRENT_DELETES, len(sale_ids))
+            current_batch = sale_ids[start_index:end_index]
+
+            print(f"\nОбработка очереди {queue_num + 1}/{total_queues} "
+                  f"(заказы {start_index + 1}-{end_index})")
+
+            # Создаем задачи для текущей очереди
+            tasks = [
+                delete_order(client, sale_id, start_index + i)
+                for i, sale_id in enumerate(current_batch)
+            ]
+
+            await asyncio.gather(*tasks)
+
+            # Добавляем задержку между очередями, кроме последней
+            if queue_num < total_queues - 1:
+                print(f"\nПауза {QUEUE_DELAY} сек. перед следующей очередью...")
+                await asyncio.sleep(QUEUE_DELAY)
+
+    elapsed_time = round((time.time() - start_time), 2)
+    print(f"\nВсе {len(sale_ids)} заказов удалены за {elapsed_time} сек.")
 
 
 async def delete_tables():
@@ -127,12 +182,14 @@ async def delete_tables():
     table = table_num[number]
     sales = await sale_list_table(table)
 
-    if sales:
+    if not sales:
+        print("На этом столике нет активных заказов для удаления")
+        return
+
+    print(f"\nНайдено {len(sales)} заказов для удаления со столика {number}")
+    confirm = input("Вы уверены, что хотите удалить все эти заказы? (y/n): ").lower()
+
+    if confirm == 'y':
         await delete_order_table(sales)
     else:
-        print("На этом столике больше нет активных заказов")
-
-    ans = input("Удалить заказы за другим столиком? (Да/Нет)\nВаш ответ: ").lower()
-    while ans == "да":
-        await delete_tables()
-        ans = input("Удалить заказы за другим столиком? (Да/Нет)\nВаш ответ: ").lower()
+        print("Удаление отменено")

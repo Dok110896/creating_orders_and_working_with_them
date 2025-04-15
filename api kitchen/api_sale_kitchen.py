@@ -5,6 +5,14 @@ import uuid
 import time
 from typing import List, Dict, Any
 from order_actions import get_price_list
+from tenacity import retry, stop_after_attempt, wait_exponential
+
+# Константы для ограничений
+MAX_CONCURRENT_REQUESTS = 100  # Лимит одновременных запросов в одной очереди
+REQUEST_TIMEOUT = 30.0  # Таймаут для каждого запроса
+RETRY_ATTEMPTS = 3  # Количество попыток повтора
+QUEUE_DELAY = 2  # Задержка между очередями в секундах
+
 
 # Пользовательская дата для работы с другими периодами при отметке
 user_date = "2024-12-10"
@@ -70,13 +78,165 @@ async def pnq_actions() -> None:
     if action == 4:
         print(f"\nУ вас {len(table_num) - 1} столика")
         await delete_tables()
-        ans = str(input("Удалить заказы за другим столиком? (Да/Нет)\n"
-                        "Ваш ответ: ")).lower()
 
-        while ans == "да":
-            await delete_tables()
-            ans = str(input("Удалить заказы за другим столиком? (Да/Нет)\n"
-                            "Ваш ответ: ")).lower()
+
+@retry(
+    stop=stop_after_attempt(RETRY_ATTEMPTS),
+    wait=wait_exponential(multiplier=1, min=4, max=10)
+)
+async def create_and_send_order(client: httpx.AsyncClient, table: int, index: int) -> None:
+    try:
+        # Создание продажи
+        sale_response = await client.post(
+            standEndpoint,
+            json={
+                "jsonrpc": "2.0",
+                "protocol": 6,
+                "method": "Sale.Create",
+                "params": {
+                    "Params": {
+                        "d": [
+                            Company,
+                            PriceList,
+                            0,
+                            {"workplace": workplace, "product": product},
+                            "order",
+                            table,
+                            Seller,
+                            True
+                        ],
+                        "s": [
+                            {"t": "Число целое", "n": "Company"},
+                            {"t": "Число целое", "n": "PriceList"},
+                            {"t": "Число целое", "n": "Type"},
+                            {"t": "JSON-объект", "n": "Properties"},
+                            {"t": "Строка", "n": "Reglament"},
+                            {"t": "Число целое", "n": "Location"},
+                            {"t": "Число целое", "n": "Seller"},
+                            {"t": "Логическое", "n": "ReturnSellerInfo"}
+                        ],
+                        "_type": "record",
+                        "f": 0
+                    }
+                },
+                "id": 1
+            },
+            headers=header,
+            timeout=REQUEST_TIMEOUT
+        )
+        sale_response.raise_for_status()
+        sale_data = sale_response.json()
+        sale = sale_data['result']['d'][0]
+
+        # Добавление номенклатуры
+        add_response = await client.post(
+            standEndpoint,
+            headers=header,
+            json={
+                "jsonrpc": "2.0",
+                "protocol": 6,
+                "method": "SaleNomenclature.AddBatch",
+                "params": {
+                    "Options": {
+                        "skip_sale_check": True,
+                        "pay_type": 0,
+                        "skip_calories": True
+                    },
+                    "Sale": sale,
+                    "Batch": {
+                        "d": [
+                            [
+                                str(uuid.uuid4()),
+                                None,
+                                None,
+                                Nomenclature,
+                                None,
+                                CatalogPrice,
+                                Quantity,
+                                {
+                                    "type_ticket": None,
+                                    "origin_quantity": 1,
+                                    "skip_serial": None
+                                }
+                            ]
+                        ],
+                        "s": [
+                            {"t": "UUID", "n": "RecordKey"},
+                            {"t": "UUID", "n": "FolderKey"},
+                            {"t": "UUID", "n": "Key"},
+                            {"t": "Число целое", "n": "Nomenclature"},
+                            {"t": "Деньги", "n": "ManualPrice"},
+                            {"t": "Деньги", "n": "CatalogPrice"},
+                            {"t": "Число вещественное", "n": "Quantity"},
+                            {"t": "JSON-объект", "n": "Properties"}
+                        ],
+                        "_type": "recordset",
+                        "f": 0
+                    }
+                },
+                "id": 1
+            },
+            timeout=REQUEST_TIMEOUT
+        )
+        add_response.raise_for_status()
+        add_data = add_response.json()
+        sale_order = add_data["result"]["d"][0][1]
+
+        # Отправка на кухню
+        await client.post(
+            standEndpoint,
+            headers=header,
+            json={
+                "jsonrpc": "2.0",
+                "protocol": 6,
+                "method": "Kitchen.SetState",
+                "params": {
+                    "rec": {
+                        "d": [
+                            5,
+                            Warehouse,
+                            {
+                                "d": [
+                                    [
+                                        sale_order,
+                                        None,
+                                        None,
+                                        sale,
+                                        0
+                                    ]
+                                ],
+                                "s": [
+                                    {"t": "Число целое", "n": "SaleNomenclature"},
+                                    {"t": "Число целое", "n": "ProductionNomenclatureQueue"},
+                                    {"t": "Число целое", "n": "State"},
+                                    {"t": "Число целое", "n": "Sale"},
+                                    {"t": "Число целое", "n": "Priority"}
+                                ],
+                                "_type": "recordset",
+                                "f": 1
+                            },
+                            Company,
+                            table
+                        ],
+                        "s": [
+                            {"t": "Число целое", "n": "State"},
+                            {"t": "Число целое", "n": "Warehouse"},
+                            {"t": "Выборка", "n": "SaleNomenclatures"},
+                            {"t": "Число целое", "n": "Company"},
+                            {"t": "Число целое", "n": "Location"}
+                        ],
+                        "_type": "record",
+                        "f": 0
+                    }
+                },
+                "id": 1
+            },
+            timeout=REQUEST_TIMEOUT
+        )
+        print(f"Заказ {index + 1} успешно обработан")
+    except Exception as e:
+        print(f"Ошибка при обработке заказа {index + 1}: {str(e)}")
+        raise
 
 
 async def generate_order_send_kitchen(table: int) -> None:
@@ -84,17 +244,41 @@ async def generate_order_send_kitchen(table: int) -> None:
     await get_price_list()
 
     start_time = time.time()
-    async with httpx.AsyncClient() as client:
-        tasks = []
-        for i in range(count):
-            tasks.append(create_and_send_order(client, table, i))
 
-        await asyncio.gather(*tasks)
+    # Создаем клиент с настройками пула соединений
+    async with httpx.AsyncClient(
+            limits=httpx.Limits(
+                max_connections=MAX_CONCURRENT_REQUESTS,
+                max_keepalive_connections=50,
+                keepalive_expiry=60
+            ),
+            timeout=httpx.Timeout(REQUEST_TIMEOUT)
+    ) as client:
+        # Разбиваем все заказы на очереди по 100
+        total_queues = (count + MAX_CONCURRENT_REQUESTS - 1) // MAX_CONCURRENT_REQUESTS
 
-    # end_time = time.time()
-    # elapsed_time = round((end_time - start_time), 2)
-    # print(f"{count} заказ(ов) созданы и отправлены на кухню за {elapsed_time} сек.")
-    print(f"{count} заказ(ов) созданы и отправлены на кухню")
+        for queue_num in range(total_queues):
+            start_index = queue_num * MAX_CONCURRENT_REQUESTS
+            end_index = min((queue_num + 1) * MAX_CONCURRENT_REQUESTS, count)
+
+            print(f"\nОбработка очереди {queue_num + 1}/{total_queues} "
+                  f"(заказы {start_index + 1}-{end_index})")
+
+            # Создаем задачи для текущей очереди
+            tasks = [
+                create_and_send_order(client, table, i)
+                for i in range(start_index, end_index)
+            ]
+
+            await asyncio.gather(*tasks)
+
+            # Добавляем задержку между очередями, кроме последней
+            if queue_num < total_queues - 1:
+                print(f"\nПауза {QUEUE_DELAY} сек. перед следующей очередью...")
+                await asyncio.sleep(QUEUE_DELAY)
+
+    elapsed_time = round((time.time() - start_time), 2)
+    print(f"\nВсе {count} заказов созданы и отправлены на кухню за {elapsed_time} сек.")
 
     answer = int(input("\n1. Продолжить работу\n"
                        "2. Закончить\n"
@@ -104,156 +288,6 @@ async def generate_order_send_kitchen(table: int) -> None:
         await select()
     elif answer == 2:
         print("Работа метода завершена")
-
-
-async def create_and_send_order(client: httpx.AsyncClient, table: int, index: int) -> None:
-    # Создание продажи
-    sale_response = await client.post(
-        standEndpoint,
-        json={
-            "jsonrpc": "2.0",
-            "protocol": 6,
-            "method": "Sale.Create",
-            "params": {
-                "Params": {
-                    "d": [
-                        Company,
-                        PriceList,
-                        0,
-                        {"workplace": workplace, "product": product},
-                        "order",
-                        table,
-                        Seller,
-                        True
-                    ],
-                    "s": [
-                        {"t": "Число целое", "n": "Company"},
-                        {"t": "Число целое", "n": "PriceList"},
-                        {"t": "Число целое", "n": "Type"},
-                        {"t": "JSON-объект", "n": "Properties"},
-                        {"t": "Строка", "n": "Reglament"},
-                        {"t": "Число целое", "n": "Location"},
-                        {"t": "Число целое", "n": "Seller"},
-                        {"t": "Логическое", "n": "ReturnSellerInfo"}
-                    ],
-                    "_type": "record",
-                    "f": 0
-                }
-            },
-            "id": 1
-        },
-        headers=header
-    )
-    sale_response.raise_for_status()
-    sale_data = sale_response.json()
-    sale = sale_data['result']['d'][0]
-    # sale_list.append(sale)
-
-    # Добавление номенклатуры
-    add_response = await client.post(
-        standEndpoint,
-        headers=header,
-        json={
-            "jsonrpc": "2.0",
-            "protocol": 6,
-            "method": "SaleNomenclature.AddBatch",
-            "params": {
-                "Options": {
-                    "skip_sale_check": True,
-                    "pay_type": 0,
-                    "skip_calories": True
-                },
-                # "Sale": sale_list[index],
-                "Sale": sale,
-                "Batch": {
-                    "d": [
-                        [
-                            str(uuid.uuid4()),
-                            None,
-                            None,
-                            Nomenclature,
-                            None,
-                            CatalogPrice,
-                            Quantity,
-                            {
-                                "type_ticket": None,
-                                "origin_quantity": 1,
-                                "skip_serial": None
-                            }
-                        ]
-                    ],
-                    "s": [
-                        {"t": "UUID", "n": "RecordKey"},
-                        {"t": "UUID", "n": "FolderKey"},
-                        {"t": "UUID", "n": "Key"},
-                        {"t": "Число целое", "n": "Nomenclature"},
-                        {"t": "Деньги", "n": "ManualPrice"},
-                        {"t": "Деньги", "n": "CatalogPrice"},
-                        {"t": "Число вещественное", "n": "Quantity"},
-                        {"t": "JSON-объект", "n": "Properties"}
-                    ],
-                    "_type": "recordset",
-                    "f": 0
-                }
-            },
-            "id": 1
-        }
-    )
-    add_response.raise_for_status()
-    add_data = add_response.json()
-    sale_order = add_data["result"]["d"][0][1]
-    # sale_nom_list.append(sale_order)
-
-    # Отправка на кухню
-    await client.post(
-        standEndpoint,
-        headers=header,
-        json={
-            "jsonrpc": "2.0",
-            "protocol": 6,
-            "method": "Kitchen.SetState",
-            "params": {
-                "rec": {
-                    "d": [
-                        5,
-                        Warehouse,
-                        {
-                            "d": [
-                                [
-                                    sale_order,
-                                    None,
-                                    None,
-                                    sale,
-                                    0
-                                ]
-                            ],
-                            "s": [
-                                {"t": "Число целое", "n": "SaleNomenclature"},
-                                {"t": "Число целое", "n": "ProductionNomenclatureQueue"},
-                                {"t": "Число целое", "n": "State"},
-                                {"t": "Число целое", "n": "Sale"},
-                                {"t": "Число целое", "n": "Priority"}
-                            ],
-                            "_type": "recordset",
-                            "f": 1
-                        },
-                        Company,
-                        table
-                    ],
-                    "s": [
-                        {"t": "Число целое", "n": "State"},
-                        {"t": "Число целое", "n": "Warehouse"},
-                        {"t": "Выборка", "n": "SaleNomenclatures"},
-                        {"t": "Число целое", "n": "Company"},
-                        {"t": "Число целое", "n": "Location"}
-                    ],
-                    "_type": "record",
-                    "f": 0
-                }
-            },
-            "id": 1
-        }
-    )
 
 
 async def main():
