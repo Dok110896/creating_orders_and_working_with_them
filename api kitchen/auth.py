@@ -1,28 +1,39 @@
+import asyncio
+
+import httpx
 from user_settings import *
-import requests
 
+async def auth_fix():
+    headers = {
+        "Content-Type": "application/json; charset=utf-8",
+        "Accept": "application/json"
+    }
 
-def auth_fix():
-    response_auth = requests.post(authEndpoint, json={
-        "jsonrpc": "2.0",
-        "method": "СБИС.Аутентифицировать",
-        "params": {
-            "Параметр": {
-                "Логин": user,
-                "Пароль": password
-            }
-        },
-        "id": 0
-    })
-
-    response_data = response_auth.json()
-    if 'result' in response_data:
-        session = response_data['result']
-        return session
-    else:
-        print("Authentication request failed. Response:", response_data)
-
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                authEndpoint,
+                json={
+                    "jsonrpc": "2.0",
+                    "method": "СБИС.Аутентифицировать",
+                    "params": {
+                        "Параметр": {
+                            "Логин": user,
+                            "Пароль": password
+                        }
+                    },
+                    "id": 0
+                },
+                headers=headers
+            )
+            response.raise_for_status()
+            data = response.json()
+            return data.get('result')
+    except Exception as e:
+        print(f"Auth error: {str(e)}")
+        return None
 
 header = {
-    "Content-Type": "application/json",
-    "X-SBISSessionID": auth_fix()}
+    "Content-Type": "application/json; charset=utf-8",
+    "X-SBISSessionID": asyncio.run(auth_fix())
+}
