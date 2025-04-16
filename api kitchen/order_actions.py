@@ -7,10 +7,10 @@ import time
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 
-MAX_CONCURRENT_DELETES = 90  # Лимит одновременных удалений в одной очереди
+MAX_CONCURRENT_DELETES = 50  # Лимит одновременных удалений в одной очереди
 DELETE_TIMEOUT = 30.0  # Таймаут для каждого запроса
 RETRY_ATTEMPTS = 3  # Количество попыток повтора
-QUEUE_DELAY = 2  # Задержка между очередями в секундах
+QUEUE_DELAY = 1  # Задержка между очередями в секундах
 
 
 async def async_post(client, json_data):

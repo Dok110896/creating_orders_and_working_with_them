@@ -8,10 +8,10 @@ from order_actions import get_price_list
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 # Константы для ограничений
-MAX_CONCURRENT_REQUESTS = 100  # Лимит одновременных запросов в одной очереди
+MAX_CONCURRENT_REQUESTS = 50  # Лимит одновременных запросов в одной очереди
 REQUEST_TIMEOUT = 30.0  # Таймаут для каждого запроса
 RETRY_ATTEMPTS = 3  # Количество попыток повтора
-QUEUE_DELAY = 2  # Задержка между очередями в секундах
+QUEUE_DELAY = 1  # Задержка между очередями в секундах
 
 
 # Пользовательская дата для работы с другими периодами при отметке
