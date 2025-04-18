@@ -22,7 +22,7 @@ async def set_pnq_state(state):
     async with httpx.AsyncClient(headers=header) as client:
         tasks = []
         for pnq in pnq_list:
-            data = {
+            pnq_set_state_json = {
                 "jsonrpc": "2.0",
                 "protocol": 6,
                 "method": "ProductionNomenclatureQueue.SetState",
@@ -40,7 +40,7 @@ async def set_pnq_state(state):
                 },
                 "id": 1
             }
-            tasks.append(async_post(client, data))
+            tasks.append(async_post(client, pnq_set_state_json))
 
         await asyncio.gather(*tasks)
 
@@ -69,7 +69,7 @@ async def check_in_work():
 
 async def verify_empty_kitchen():
     current_date = datetime.now().date()
-    data = {
+    task_list_json = {
         "jsonrpc": "2.0",
         "protocol": 6,
         "method": "Kitchen.TaskList",
@@ -101,14 +101,13 @@ async def verify_empty_kitchen():
     }
 
     async with httpx.AsyncClient(headers=header) as client:
-        response = await async_post(client, data)
+        response = await async_post(client, task_list_json)
         if response:
             av = [row[18] for row in response['result']['d']]
             assert len(av) == 0, "На кухне остались блюда"
 
 
 async def get_pnq_list():
-    # current_time = "2025-04-15"   # Фиксированная дата для действий с другим днем
     current_date = datetime.now().date()
 
     data = {

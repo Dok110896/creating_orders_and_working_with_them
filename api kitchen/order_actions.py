@@ -25,7 +25,7 @@ async def async_post(client, json_data):
 
 async def get_price_list():
     current_date = datetime.now().date()
-    data = {
+    fast_menu_list_json = {
         "jsonrpc": "2.0",
         "protocol": 6,
         "method": "FastMenu.List",
@@ -55,14 +55,14 @@ async def get_price_list():
     }
 
     async with httpx.AsyncClient(headers=header) as client:
-        response = await async_post(client, data)
+        response = await async_post(client, fast_menu_list_json)
         if response and 'result' in response:
             return [row[8] for row in response['result']['d'] if row[8] is not None]
     return []
 
 
 async def sale_list_table(table):
-    data = {
+    sale_list_table_json = {
         "jsonrpc": "2.0",
         "protocol": 6,
         "method": "Sale.RestoreMemo",
@@ -87,7 +87,7 @@ async def sale_list_table(table):
     }
 
     async with httpx.AsyncClient(headers=header) as client:
-        response = await async_post(client, data)
+        response = await async_post(client, sale_list_table_json)
         if response and 'result' in response:
             return [row[0] for row in response['result']['d']]
     return []
@@ -99,7 +99,7 @@ async def sale_list_table(table):
 )
 async def delete_order(client: httpx.AsyncClient, sale_id: int, index: int = None) -> None:
     try:
-        cancel_data = {
+        cancel_data_json = {
             "jsonrpc": "2.0",
             "protocol": 6,
             "method": "Sale.Cancel",
@@ -120,9 +120,9 @@ async def delete_order(client: httpx.AsyncClient, sale_id: int, index: int = Non
 
         # Отправляем оба варианта запроса (с RefusalReason и без)
         responses = await asyncio.gather(
-            client.post(standEndpoint, json=cancel_data, headers=header, timeout=DELETE_TIMEOUT),
+            client.post(standEndpoint, json=cancel_data_json, headers=header, timeout=DELETE_TIMEOUT),
             client.post(standEndpoint,
-                        json={**cancel_data, "params": {**cancel_data["params"], "RefusalReason": None}},
+                        json={**cancel_data_json, "params": {**cancel_data_json["params"], "RefusalReason": None}},
                         headers=header,
                         timeout=DELETE_TIMEOUT)
         )

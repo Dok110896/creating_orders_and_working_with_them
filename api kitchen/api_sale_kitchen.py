@@ -50,11 +50,16 @@ async def scheduled_job():
 async def run_scheduler():
     """Запуск планировщика с асинхронными задачами"""
     # Первый запуск
-    # global scheduler_task
     print(f"Планировщик запущен. Интервал: {INTERVAL_MINUTES} мин, с {WORK_START} до {WORK_END}")
-
-    # scheduler_task = asyncio.create_task(scheduled_job())
     await asyncio.create_task(scheduled_job())
+
+
+# Подумать над реализацией и убрать дублирование в методах для получения столика
+def get_number_table():
+    print(f"\nУ вас на схеме {len(table_num) - 1} столика")
+    number = int(input("Введите номер столика где будут созданы или удалены заказы: "))
+    table = table_num[number]
+    return table
 
 
 async def pnq_actions() -> None:
@@ -101,9 +106,7 @@ async def pnq_actions() -> None:
 async def create_and_send_order(client: httpx.AsyncClient, table: int, index: int) -> None:
     try:
         # Создание продажи
-        sale_response = await client.post(
-            standEndpoint,
-            json={
+        sale_create_json = {
                 "jsonrpc": "2.0",
                 "protocol": 6,
                 "method": "Sale.Create",
@@ -134,19 +137,14 @@ async def create_and_send_order(client: httpx.AsyncClient, table: int, index: in
                     }
                 },
                 "id": 1
-            },
-            headers=header,
-            timeout=REQUEST_TIMEOUT
-        )
+            }
+        sale_response = await client.post(standEndpoint, json=sale_create_json, headers=header, timeout=REQUEST_TIMEOUT)
         sale_response.raise_for_status()
         sale_data = sale_response.json()
         sale = sale_data['result']['d'][0]
 
         # Добавление номенклатуры
-        add_response = await client.post(
-            standEndpoint,
-            headers=header,
-            json={
+        sale_nomenclature_add_batch_json = {
                 "jsonrpc": "2.0",
                 "protocol": 6,
                 "method": "SaleNomenclature.AddBatch",
@@ -189,18 +187,14 @@ async def create_and_send_order(client: httpx.AsyncClient, table: int, index: in
                     }
                 },
                 "id": 1
-            },
-            timeout=REQUEST_TIMEOUT
-        )
+            }
+        add_response = await client.post(standEndpoint, headers=header, json=sale_nomenclature_add_batch_json, timeout=REQUEST_TIMEOUT)
         add_response.raise_for_status()
         add_data = add_response.json()
         sale_order = add_data["result"]["d"][0][1]
 
         # Отправка на кухню
-        await client.post(
-            standEndpoint,
-            headers=header,
-            json={
+        kitchen_set_state_json = {
                 "jsonrpc": "2.0",
                 "protocol": 6,
                 "method": "Kitchen.SetState",
@@ -244,9 +238,8 @@ async def create_and_send_order(client: httpx.AsyncClient, table: int, index: in
                     }
                 },
                 "id": 1
-            },
-            timeout=REQUEST_TIMEOUT
-        )
+            }
+        await client.post(standEndpoint, headers=header, json=kitchen_set_state_json, timeout=REQUEST_TIMEOUT)
         print(f"Заказ {index + 1} успешно обработан")
     except Exception as e:
         print(f"Ошибка при обработке заказа {index + 1}: {str(e)}")
@@ -309,6 +302,7 @@ async def select() -> None:
         print(f"\nУ вас на схеме {len(table_num) - 1} столика")
         number = int(input("Введите номер столика где будут созданы заказы: "))
         table = table_num[number]
+        # get_number_table()
         await generate_order_send_kitchen(table)
 
     elif ans == 2:
