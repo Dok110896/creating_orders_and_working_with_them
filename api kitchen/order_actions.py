@@ -104,8 +104,8 @@ def get_price_list():
     }).json()
     sale = response['result']['d']
     for row in sale:
-        if row[8] is not None:
-            menu_list.append(row[8])
+        if row[16] is not None:
+            menu_list.append(row[16])
 
 
 def sale_list_table(table):
