@@ -1,9 +1,10 @@
-from kitchen_actions import *
 import httpx
 import asyncio
 import uuid
 import time
-from typing import List, Dict, Any
+from datetime import datetime, time as dt_time
+from kitchen_actions import *
+from typing import List
 from order_actions import get_price_list
 from tenacity import retry, stop_after_attempt, wait_exponential
 
@@ -12,7 +13,12 @@ MAX_CONCURRENT_REQUESTS = 50  # Лимит одновременных запро
 REQUEST_TIMEOUT = 30.0  # Таймаут для каждого запроса
 RETRY_ATTEMPTS = 3  # Количество попыток повтора
 QUEUE_DELAY = 1  # Задержка между очередями в секундах
-
+WORK_START = dt_time(7, 0)
+WORK_END = dt_time(19, 0)
+INTERVAL_MINUTES = 2
+ORDERS_PER_BATCH = 10
+MAX_RETRIES = 3  # Максимальное количество попыток повтора запроса
+DEFAULT_TABLE = 4  # Столик по умолчанию для шедулера индекс списка
 
 # Пользовательская дата для работы с другими периодами при отметке
 user_date = "2024-12-10"
@@ -22,25 +28,33 @@ sale_list: List[int] = []
 sale_nom_list: List[int] = []
 menu_list: List[int] = []
 sale_table: List[int] = []
+scheduler_task = None  # Для хранения задачи планировщика
 
 
-async def select() -> None:
-    ans = int(input(
-        "\nЧто нужно сделать?\n"
-        "1. Создать заказы\n"
-        "2. Работать с заказами\n"
-        "Ваш выбор: "))
+async def scheduled_job():
+    """Асинхронная задача для планировщика"""
+    while True:
+        now = datetime.now().time()
+        if WORK_START <= now <= WORK_END:
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] Начало формирования {ORDERS_PER_BATCH} заказов")
+            try:
+                await generate_order_send_kitchen(table_num[DEFAULT_TABLE], ORDERS_PER_BATCH)
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] Успешно создано {ORDERS_PER_BATCH} заказов")
+            except Exception as e:
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] Ошибка при создании заказов: {str(e)}")
 
-    if ans == 1:
-        print(f"\nУ вас на схеме {len(table_num) - 1} столика")
-        number = int(input("Введите номер столика где будут созданы заказы: "))
-        table = table_num[number]
-        await generate_order_send_kitchen(table)
+        # Ждем до следующего выполнения
+        await asyncio.sleep(INTERVAL_MINUTES * 60)
 
-    elif ans == 2:
-        await pnq_actions()
-    else:
-        print("Неправильный выбор")
+
+async def run_scheduler():
+    """Запуск планировщика с асинхронными задачами"""
+    # Первый запуск
+    # global scheduler_task
+    print(f"Планировщик запущен. Интервал: {INTERVAL_MINUTES} мин, с {WORK_START} до {WORK_END}")
+
+    # scheduler_task = asyncio.create_task(scheduled_job())
+    await asyncio.create_task(scheduled_job())
 
 
 async def pnq_actions() -> None:
@@ -239,10 +253,12 @@ async def create_and_send_order(client: httpx.AsyncClient, table: int, index: in
         raise
 
 
-async def generate_order_send_kitchen(table: int) -> None:
-    count = int(input("\nУкажите количество заказов: "))
-    await get_price_list()
+async def generate_order_send_kitchen(table: int, count: int = None) -> None:
+    """Асинхронное создание и отправка заказов на кухню"""
+    if count is None:
+        count = int(input("\nУкажите количество заказов: "))
 
+    await get_price_list()
     start_time = time.time()
 
     # Создаем клиент с настройками пула соединений
@@ -280,14 +296,28 @@ async def generate_order_send_kitchen(table: int) -> None:
     elapsed_time = round((time.time() - start_time), 2)
     print(f"\nВсе {count} заказов созданы и отправлены на кухню за {elapsed_time} сек.")
 
-    answer = int(input("\n1. Продолжить работу\n"
-                       "2. Закончить\n"
-                       "Ваш выбор: "))
 
-    if answer == 1:
-        await select()
-    elif answer == 2:
-        print("Работа метода завершена")
+async def select() -> None:
+    ans = int(input(
+        "\nЧто нужно сделать?\n"
+        "1. Создать заказы\n"
+        "2. Работать с заказами\n"
+        "3. Запустить генератор заказов (шедулер)\n"
+        "Ваш выбор: "))
+
+    if ans == 1:
+        print(f"\nУ вас на схеме {len(table_num) - 1} столика")
+        number = int(input("Введите номер столика где будут созданы заказы: "))
+        table = table_num[number]
+        await generate_order_send_kitchen(table)
+
+    elif ans == 2:
+        await pnq_actions()
+
+    elif ans == 3:
+        await run_scheduler()
+    else:
+        print("Неправильный выбор")
 
 
 async def main():
@@ -295,4 +325,10 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\nПрограмма завершена")
+    except Exception as e:
+        print(f"Критическая ошибка: {str(e)}")
+
