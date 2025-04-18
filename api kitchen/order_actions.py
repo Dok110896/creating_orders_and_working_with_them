@@ -31,16 +31,14 @@ async def get_price_list():
         "method": "FastMenu.List",
         "params": {
             "Фильтр": {
-                "d": [Company, ColumnCount, Company, str(current_date),
-                      "tile", PriceList, RowCount, [], Warehouse],
+                "d": [Company, Company, str(current_date),
+                      "tile", PriceList, [], Warehouse],
                 "s": [
                     {"t": "Число целое", "n": "BalanceForOrganization"},
-                    {"t": "Число целое", "n": "ColumnCount"},
                     {"t": "Число целое", "n": "Company"},
                     {"t": "Строка", "n": "DateTime"},
                     {"t": "Строка", "n": "Mode"},
                     {"t": "Число целое", "n": "PriceList"},
-                    {"t": "Число целое", "n": "RowCount"},
                     {"t": {"n": "Массив", "t": "Строка"}, "n": "UUIDsExclude"},
                     {"t": "Число целое", "n": "Warehouse"}
                 ],
