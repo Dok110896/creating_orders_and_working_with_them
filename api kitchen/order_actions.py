@@ -1,240 +1,185 @@
 from auth import *
+from config import *
 from datetime import datetime
 import time
-import requests
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 
-pnq_list = []
-sale_list = []
-sale_nom_list = []
-menu_list = []
-sale_table = []
+async def async_post(client, json_data):
+    try:
+        response = await client.post(standEndpoint, json=json_data)
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        print(f"Request error: {str(e)}")
+        return None
 
 
-# Получение списка номенклатур из прайса для формирования разных заказов
-def get_price_list():
+async def get_price_list():
     current_date = datetime.now().date()
-    response = requests.post(standEndpoint, headers=header, json={
+    fast_menu_list_json = {
         "jsonrpc": "2.0",
         "protocol": 6,
         "method": "FastMenu.List",
         "params": {
             "Фильтр": {
-                "d": [
-                    Company, ColumnCount, Company, str(current_date),
-                    "tile",
-                    PriceList,
-                    RowCount,
-                    [],
-                    Warehouse
-                ],
+                "d": [Company, Company, str(current_date),
+                      "tile", PriceList, [], Warehouse],
                 "s": [
-                    {
-                        "t": "Число целое",
-                        "n": "BalanceForOrganization"
-                    },
-                    {
-                        "t": "Число целое",
-                        "n": "ColumnCount"
-                    },
-                    {
-                        "t": "Число целое",
-                        "n": "Company"
-                    },
-                    {
-                        "t": "Строка",
-                        "n": "DateTime"
-                    },
-                    {
-                        "t": "Строка",
-                        "n": "Mode"
-                    },
-                    {
-                        "t": "Число целое",
-                        "n": "PriceList"
-                    },
-                    {
-                        "t": "Число целое",
-                        "n": "RowCount"
-                    },
-                    {
-                        "t": {
-                            "n": "Массив",
-                            "t": "Строка"
-                        },
-                        "n": "UUIDsExclude"
-                    },
-                    {
-                        "t": "Число целое",
-                        "n": "Warehouse"
-                    }
+                    {"t": "Число целое", "n": "BalanceForOrganization"},
+                    {"t": "Число целое", "n": "Company"},
+                    {"t": "Строка", "n": "DateTime"},
+                    {"t": "Строка", "n": "Mode"},
+                    {"t": "Число целое", "n": "PriceList"},
+                    {"t": {"n": "Массив", "t": "Строка"}, "n": "UUIDsExclude"},
+                    {"t": "Число целое", "n": "Warehouse"}
                 ],
                 "_type": "record",
                 "f": 0
             },
             "Сортировка": None,
-            "Навигация": {
-                "d": [
-                    True,
-                    999,
-                    0
-                ],
-                "s": [
-                    {
-                        "t": "Логическое",
-                        "n": "ЕстьЕще"
-                    },
-                    {
-                        "t": "Число целое",
-                        "n": "РазмерСтраницы"
-                    },
-                    {
-                        "t": "Число целое",
-                        "n": "Страница"
-                    }
-                ],
-                "_type": "record",
-                "f": 0
-            },
-            "ДопПоля": [
-                "Certificates"
-            ]
+            "Навигация": {"d": [True, 999, 0]},
+            "ДопПоля": ["Certificates"]
         },
         "id": 1
-    }).json()
-    sale = response['result']['d']
-    for row in sale:
-        if row[16] is not None:
-            menu_list.append(row[16])
+    }
+
+    async with httpx.AsyncClient(headers=header) as client:
+        response = await async_post(client, fast_menu_list_json)
+        if response and 'result' in response:
+            return [row[8] for row in response['result']['d'] if row[8] is not None]
+    return []
 
 
-def sale_list_table(table):
-    response = requests.post(standEndpoint, headers=header, json={
+async def sale_list_table(table):
+    sale_list_table_json = {
         "jsonrpc": "2.0",
         "protocol": 6,
         "method": "Sale.RestoreMemo",
         "params": {
             "Params": {
-                "d": [
-                    None,
-                    table,
-                    True,
-                    None,
-                    False,
-                    False,
-                    True,
-                    True
-                ],
+                "d": [None, table, True, None, False, False, True, True],
                 "s": [
-                    {
-                        "t": "Число целое",
-                        "n": "Workplace"
-                    },
-                    {
-                        "t": "Число целое",
-                        "n": "Location"
-                    },
-                    {
-                        "t": "Логическое",
-                        "n": "ShowDiscounts"
-                    },
-                    {
-                        "t": "Число целое",
-                        "n": "PriceList"
-                    },
-                    {
-                        "t": "Логическое",
-                        "n": "ReversePositions"
-                    },
-                    {
-                        "t": "Логическое",
-                        "n": "CreateSale"
-                    },
-                    {
-                        "t": "Логическое",
-                        "n": "ShowGuests"
-                    },
-                    {
-                        "t": "Логическое",
-                        "n": "ShowTables"
-                    }
+                    {"t": "Число целое", "n": "Workplace"},
+                    {"t": "Число целое", "n": "Location"},
+                    {"t": "Логическое", "n": "ShowDiscounts"},
+                    {"t": "Число целое", "n": "PriceList"},
+                    {"t": "Логическое", "n": "ReversePositions"},
+                    {"t": "Логическое", "n": "CreateSale"},
+                    {"t": "Логическое", "n": "ShowGuests"},
+                    {"t": "Логическое", "n": "ShowTables"}
                 ],
                 "_type": "record",
                 "f": 0
             }
         },
         "id": 1
-    }).json()
+    }
 
-    sale = response['result']['d']
-    for row in sale:
-        sale_table.append(row[0])
+    async with httpx.AsyncClient(headers=header) as client:
+        response = await async_post(client, sale_list_table_json)
+        if response and 'result' in response:
+            return [row[0] for row in response['result']['d']]
+    return []
 
 
-def delete_order_table():
-    start_time = time.time()
-    for d in range(len(sale_table)):
-        requests.post(standEndpoint, headers=header, json={
+@retry(
+    stop=stop_after_attempt(RETRY_ATTEMPTS),
+    wait=wait_exponential(multiplier=1, min=4, max=10)
+)
+async def delete_order(client: httpx.AsyncClient, sale_id: int, index: int = None) -> None:
+    try:
+        cancel_data_json = {
             "jsonrpc": "2.0",
             "protocol": 6,
             "method": "Sale.Cancel",
             "params": {
-                "Sale": sale_table[d],
+                "Sale": sale_id,
                 "RefusalReason": 5,
                 "Workplace": None,
                 "AuthInfo": None,
                 "Params": {
-                    "d": [
-                        True
-                    ],
-                    "s": [
-                        {
-                            "t": "Логическое",
-                            "n": "CheckUnfinishedTasks"
-                        }
-                    ],
+                    "d": [True],
+                    "s": [{"t": "Логическое", "n": "CheckUnfinishedTasks"}],
                     "_type": "record",
                     "f": 0
                 }
             },
             "id": 1
-        }).json()
+        }
 
-        requests.post(standEndpoint, headers=header, json={
-            "jsonrpc": "2.0",
-            "protocol": 6,
-            "method": "Sale.Cancel",
-            "params": {
-                "Sale": sale_table[d],
-                "RefusalReason": None,
-                "Workplace": None,
-                "AuthInfo": None,
-                "Params": {
-                    "d": [
-                        True
-                    ],
-                    "s": [
-                        {
-                            "t": "Логическое",
-                            "n": "CheckUnfinishedTasks"
-                        }
-                    ],
-                    "_type": "record",
-                    "f": 0
-                }
-            },
-            "id": 1
-        }).json()
-    end_time = time.time()
-    elapsed_time = round((end_time - start_time), 2)
-    print(f"Все заказы удалены за {elapsed_time} сек.\n")
+        # Отправляем оба варианта запроса (с RefusalReason и без)
+        responses = await asyncio.gather(
+            client.post(standEndpoint, json=cancel_data_json, headers=header, timeout=DELETE_TIMEOUT),
+            client.post(standEndpoint,
+                        json={**cancel_data_json, "params": {**cancel_data_json["params"], "RefusalReason": None}},
+                        headers=header,
+                        timeout=DELETE_TIMEOUT)
+        )
+
+        for response in responses:
+            response.raise_for_status()
+
+        if index is not None:
+            print(f"Заказ {index + 1} (ID: {sale_id}) успешно удален")
+    except Exception as e:
+        print(f"Ошибка при удалении заказа {f'{index + 1} ' if index is not None else ''}(ID: {sale_id}): {str(e)}")
+        raise
 
 
-def delete_tables():
-    number = int(input("Введите номер столика для удаления заказов: \n"))
+async def delete_order_table(sale_ids: list) -> None:
+    start_time = time.time()
+
+    # Создаем клиент с настройками пула соединений
+    async with httpx.AsyncClient(
+            limits=httpx.Limits(
+                max_connections=MAX_CONCURRENT_DELETES,
+                max_keepalive_connections=50,
+                keepalive_expiry=60
+            ),
+            timeout=httpx.Timeout(DELETE_TIMEOUT)
+    ) as client:
+        # Разбиваем все заказы на очереди
+        total_queues = (len(sale_ids) + MAX_CONCURRENT_DELETES - 1) // MAX_CONCURRENT_DELETES
+
+        for queue_num in range(total_queues):
+            start_index = queue_num * MAX_CONCURRENT_DELETES
+            end_index = min((queue_num + 1) * MAX_CONCURRENT_DELETES, len(sale_ids))
+            current_batch = sale_ids[start_index:end_index]
+
+            print(f"\nОбработка очереди {queue_num + 1}/{total_queues} "
+                  f"(заказы {start_index + 1}-{end_index})")
+
+            # Создаем задачи для текущей очереди
+            tasks = [
+                delete_order(client, sale_id, start_index + i)
+                for i, sale_id in enumerate(current_batch)
+            ]
+
+            await asyncio.gather(*tasks)
+
+            # Добавляем задержку между очередями, кроме последней
+            if queue_num < total_queues - 1:
+                print(f"\nПауза {QUEUE_DELAY} сек. перед следующей очередью...")
+                await asyncio.sleep(QUEUE_DELAY)
+
+    elapsed_time = round((time.time() - start_time), 2)
+    print(f"\nВсе {len(sale_ids)} заказов удалены за {elapsed_time} сек.")
+
+
+async def delete_tables():
+    number = int(input("Введите номер столика для удаления заказов: "))
     table = table_num[number]
-    sale_list_table(table)
-    if sale_table != []:
-        delete_order_table()
+    sales = await sale_list_table(table)
+
+    if not sales:
+        print("На этом столике нет активных заказов для удаления")
+        return
+
+    print(f"\nНайдено {len(sales)} заказов для удаления со столика {number}")
+    confirm = input("Вы уверены, что хотите удалить все эти заказы? (y/n): ").lower()
+
+    if confirm == 'y':
+        await delete_order_table(sales)
     else:
-        print("На этом столике больше нет активных заказов")
+        print("Удаление отменено")
