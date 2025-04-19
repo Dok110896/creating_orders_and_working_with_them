@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 from kitchen_actions import *
 from typing import List
 from order_actions import get_price_list
@@ -36,14 +37,6 @@ async def run_scheduler():
     await asyncio.create_task(scheduled_job())
 
 
-# Подумать над реализацией и убрать дублирование в методах для получения столика
-def get_number_table():
-    print(f"\nУ вас на схеме {len(table_num) - 1} столика")
-    number = int(input("Введите номер столика где будут созданы или удалены заказы: "))
-    table = table_num[number]
-    return table
-
-
 async def pnq_actions() -> None:
     await get_pnq_list()
 
@@ -58,16 +51,6 @@ async def pnq_actions() -> None:
     if len(pnq_list) != 0:
         if action == 1:
             await check_ready()
-            answer = int(input("\nОтметить все блюда выданными:\n"
-                               "1 - Да,\n"
-                               "2 - Нет\n"
-                               "Ваш ответ: "))
-
-            if answer == 1:
-                await get_pnq_list()
-                await check_served()
-            elif answer == 2:
-                print("Запустите метод еще раз чтобы выполнить другое действие")
 
         elif action == 2:
             await check_served()
@@ -274,7 +257,7 @@ async def generate_order_send_kitchen(table: int, count: int = None) -> None:
 
 async def select() -> None:
     ans = int(input(
-        "\nЧто нужно сделать?\n"
+        "Что нужно сделать?\n"
         "1. Создать заказы\n"
         "2. Работать с заказами\n"
         "3. Запустить генератор заказов (шедулер)\n"
@@ -284,7 +267,6 @@ async def select() -> None:
         print(f"\nУ вас на схеме {len(table_num) - 1} столика")
         number = int(input("Введите номер столика где будут созданы заказы: "))
         table = table_num[number]
-        # get_number_table()
         await generate_order_send_kitchen(table)
 
     elif ans == 2:
@@ -307,4 +289,3 @@ if __name__ == "__main__":
         print("\nПрограмма завершена")
     except Exception as e:
         print(f"Критическая ошибка: {str(e)}")
-

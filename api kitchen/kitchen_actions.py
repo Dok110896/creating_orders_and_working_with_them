@@ -1,6 +1,6 @@
 from auth import *
 from config import *
-from order_actions import delete_tables
+from datetime import datetime
 import time
 
 
@@ -60,7 +60,7 @@ async def check_ready():
 
 async def check_served():
     await set_pnq_state(15)
-    await verify_empty_kitchen()
+    # await verify_empty_kitchen()
 
 
 async def check_in_work():
@@ -199,33 +199,3 @@ async def get_pnq_list():
         except Exception as e:
             print(f"Ошибка в get_pnq_list: {str(e)}")
             return []
-
-
-async def pnq_actions():
-    await get_pnq_list()
-
-    if not pnq_list:
-        print("Нет активных заказов")
-        return
-
-    action = int(input(
-        "\nВыберите действие над заказами:\n"
-        "1. Отметить всё готовым\n"
-        "2. Отметить всё выданным\n"
-        "3. Вернуть всё в работу\n"
-        "4. Удалить заказы на столике\n"
-        "Ваш выбор: "))
-
-    if action == 1:
-        await check_ready()
-        answer = int(input("\nОтметить все блюда выданными:\n1 - Да,\n2 - Нет\nВаш ответ: "))
-        if answer == 1:
-            await get_pnq_list()
-            await check_served()
-    elif action == 2:
-        await check_served()
-    elif action == 3:
-        await check_in_work()
-        print('Все блюда возвращены в работу')
-    elif action == 4:
-        await delete_tables()
