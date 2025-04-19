@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from kitchen_actions import *
 from typing import List
-from order_actions import get_price_list
+from order_actions import get_price_list, delete_tables
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 
