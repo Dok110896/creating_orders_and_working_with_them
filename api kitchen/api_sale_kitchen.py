@@ -1,27 +1,9 @@
-import httpx
-import asyncio
 import uuid
-import time
-from datetime import datetime, time as dt_time
 from kitchen_actions import *
 from typing import List
 from order_actions import get_price_list
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-# Константы для ограничений
-MAX_CONCURRENT_REQUESTS = 50  # Лимит одновременных запросов в одной очереди
-REQUEST_TIMEOUT = 30.0  # Таймаут для каждого запроса
-RETRY_ATTEMPTS = 3  # Количество попыток повтора
-QUEUE_DELAY = 1  # Задержка между очередями в секундах
-WORK_START = dt_time(7, 0)
-WORK_END = dt_time(19, 0)
-INTERVAL_MINUTES = 2
-ORDERS_PER_BATCH = 10
-MAX_RETRIES = 3  # Максимальное количество попыток повтора запроса
-DEFAULT_TABLE = 4  # Столик по умолчанию для шедулера индекс списка
-
-# Пользовательская дата для работы с другими периодами при отметке
-user_date = "2024-12-10"
 
 # Переменные внутри методов
 sale_list: List[int] = []

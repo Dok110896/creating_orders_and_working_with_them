@@ -1,8 +1,8 @@
-from datetime import datetime
 from auth import *
+from config import *
 from order_actions import delete_tables
-from user_settings import *
 import time
+
 
 pnq_list = []
 

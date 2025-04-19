@@ -1,7 +1,7 @@
+from config import *
 import asyncio
-
 import httpx
-from user_settings import *
+
 
 async def auth_fix():
     headers = {

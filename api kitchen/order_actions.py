@@ -1,16 +1,8 @@
-import asyncio
-import httpx
 from auth import *
-from user_settings import *
+from config import *
 from datetime import datetime
 import time
 from tenacity import retry, stop_after_attempt, wait_exponential
-
-
-MAX_CONCURRENT_DELETES = 50  # Лимит одновременных удалений в одной очереди
-DELETE_TIMEOUT = 30.0  # Таймаут для каждого запроса
-RETRY_ATTEMPTS = 3  # Количество попыток повтора
-QUEUE_DELAY = 1  # Задержка между очередями в секундах
 
 
 async def async_post(client, json_data):
@@ -176,7 +168,7 @@ async def delete_order_table(sale_ids: list) -> None:
 
 
 async def delete_tables():
-    number = int(input("Введите номер столика для удаления заказов: \n"))
+    number = int(input("Введите номер столика для удаления заказов: "))
     table = table_num[number]
     sales = await sale_list_table(table)
 

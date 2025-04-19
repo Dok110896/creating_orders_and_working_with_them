@@ -1,3 +1,4 @@
+from datetime import datetime, time as dt_time
 # Авторизация
 # Данные по авторизации стенд, логин и пароль
 authEndpoint = "https://fix-sso.sbis.ru/auth/service/"
