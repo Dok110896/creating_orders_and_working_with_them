@@ -81,10 +81,9 @@ async def create_and_send_order(client: httpx.AsyncClient, table: int, index: in
                             Company,
                             PriceList,
                             0,
-                            {"workplace": workplace, "product": product},
+                            {"product": product},
                             "order",
                             table,
-                            Seller,
                             True
                         ],
                         "s": [
@@ -94,7 +93,6 @@ async def create_and_send_order(client: httpx.AsyncClient, table: int, index: in
                             {"t": "JSON-объект", "n": "Properties"},
                             {"t": "Строка", "n": "Reglament"},
                             {"t": "Число целое", "n": "Location"},
-                            {"t": "Число целое", "n": "Seller"},
                             {"t": "Логическое", "n": "ReturnSellerInfo"}
                         ],
                         "_type": "record",
