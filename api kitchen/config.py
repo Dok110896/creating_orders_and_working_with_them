@@ -3,8 +3,12 @@ from datetime import time as dt_time
 "Данные по авторизации стенд, логин и пароль"
 authEndpoint = "https://fix-sso.sbis.ru/auth/service/"
 standEndpoint = "https://fix-online.sbis.ru/service/"
-user = None
-password = None
+user = ''
+password = ''
+
+# authEndpoint = "http://127.0.0.1:7071/auth/service/"  # Changed to HTTP
+# standEndpoint = "http://127.0.0.1:7071/PrestoOffline/service/"
+
 
 table_num = {
     0: 0,  # чтоб билось по значению добавлен 0
