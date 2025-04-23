@@ -6,7 +6,7 @@ standEndpoint = "https://fix-online.sbis.ru/service/"
 user = ''
 password = ''
 
-# authEndpoint = "http://127.0.0.1:7071/auth/service/"  # Changed to HTTP
+# authEndpoint = "http://127.0.0.1:7071/auth/service/"
 # standEndpoint = "http://127.0.0.1:7071/PrestoOffline/service/"
 
 
