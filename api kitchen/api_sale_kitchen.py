@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from kitchen_actions import *
 from typing import List
-from order_actions import get_price_list, delete_tables
+from order_actions import delete_tables
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 
@@ -214,7 +214,6 @@ async def generate_order_send_kitchen(table: int, count: int = None) -> None:
     if count is None:
         count = int(input("\nУкажите количество заказов: "))
 
-    await get_price_list()
     start_time = time.time()
 
     # Создаем клиент с настройками пула соединений

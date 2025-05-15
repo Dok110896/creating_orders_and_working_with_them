@@ -15,42 +15,6 @@ async def async_post(client, json_data):
         return None
 
 
-async def get_price_list():
-    current_date = datetime.now().date()
-    fast_menu_list_json = {
-        "jsonrpc": "2.0",
-        "protocol": 6,
-        "method": "FastMenu.List",
-        "params": {
-            "Фильтр": {
-                "d": [Company, Company, str(current_date),
-                      "tile", PriceList, [], Warehouse],
-                "s": [
-                    {"t": "Число целое", "n": "BalanceForOrganization"},
-                    {"t": "Число целое", "n": "Company"},
-                    {"t": "Строка", "n": "DateTime"},
-                    {"t": "Строка", "n": "Mode"},
-                    {"t": "Число целое", "n": "PriceList"},
-                    {"t": {"n": "Массив", "t": "Строка"}, "n": "UUIDsExclude"},
-                    {"t": "Число целое", "n": "Warehouse"}
-                ],
-                "_type": "record",
-                "f": 0
-            },
-            "Сортировка": None,
-            "Навигация": {"d": [True, 999, 0]},
-            "ДопПоля": ["Certificates"]
-        },
-        "id": 1
-    }
-
-    async with httpx.AsyncClient(headers=header) as client:
-        response = await async_post(client, fast_menu_list_json)
-        if response and 'result' in response:
-            return [row[8] for row in response['result']['d'] if row[8] is not None]
-    return []
-
-
 async def sale_list_table(table):
     sale_list_table_json = {
         "jsonrpc": "2.0",
