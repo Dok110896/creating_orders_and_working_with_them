@@ -47,35 +47,18 @@ async def auth_fix():
             },
             "id": 1
         }
-        # метод авторизации онлайн
-        sbis_auth = {
-                    "jsonrpc": "2.0",
-                    "method": "СБИС.Аутентифицировать",
-                    "params": {
-                        "Параметр": {
-                            "Логин": user,
-                            "Пароль": password
-                        }
-                    },
-                    "id": 0
-                }
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 authEndpoint,
                 headers=headers,
-                # для авторизации на онлайне
-                json=sbis_auth,
-
                 # для авторизации оффлайн
-                # json=json_sap
+                json=json_sap
             )
             response.raise_for_status()
             data = response.json()
-            # получение id сессии облако
-            return data.get('result')
 
             # получение id сессии оффлайн
-            # return data['result']['d'][0][1]
+            return data['result']['d'][0][1]
 
     except Exception as e:
         print(f"Auth error: {str(e)}")
