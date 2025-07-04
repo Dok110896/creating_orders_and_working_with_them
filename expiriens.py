@@ -1,6 +1,6 @@
 import requests
 from date import *
-from json_cal_methods import auth, fastmenu_list
+from json_cal_methods import sale_create
 from config import *
 
 # authEndpoint = "http://127.0.0.1:7071/auth/service/"
@@ -17,43 +17,43 @@ def auth_fix():
     }
     try:
         # метод авторизации оффлайн
-        json_sap = {
-            "jsonrpc": "2.0",
-            "protocol": 5,
-            "method": "SAP.Authenticate",
-            "params": {
-                "data": {
-                    "d": [user, password, True, None, False, None, True, True],
-                    "s": [{
-                        "t": "Строка",
-                        "n": "login"
-                    }, {
-                        "t": "Строка",
-                        "n": "password"
-                    }, {
-                        "t": "Логическое",
-                        "n": "only_account"
-                    }, {
-                        "t": "Логическое",
-                        "n": "stranger"
-                    }, {
-                        "t": "Логическое",
-                        "n": "license_extended"
-                    }, {
-                        "t": "Строка",
-                        "n": "license_session_id"
-                    }, {
-                        "t": "Логическое",
-                        "n": "from_browser"
-                    }, {
-                        "t": "Логическое",
-                        "n": "get_last_url"
-                    }],
-                    "_type": "record"
-                }
-            },
-            "id": 1
-        }
+        # json_sap = {
+        #     "jsonrpc": "2.0",
+        #     "protocol": 5,
+        #     "method": "SAP.Authenticate",
+        #     "params": {
+        #         "data": {
+        #             "d": [user, password, True, None, False, None, True, True],
+        #             "s": [{
+        #                 "t": "Строка",
+        #                 "n": "login"
+        #             }, {
+        #                 "t": "Строка",
+        #                 "n": "password"
+        #             }, {
+        #                 "t": "Логическое",
+        #                 "n": "only_account"
+        #             }, {
+        #                 "t": "Логическое",
+        #                 "n": "stranger"
+        #             }, {
+        #                 "t": "Логическое",
+        #                 "n": "license_extended"
+        #             }, {
+        #                 "t": "Строка",
+        #                 "n": "license_session_id"
+        #             }, {
+        #                 "t": "Логическое",
+        #                 "n": "from_browser"
+        #             }, {
+        #                 "t": "Логическое",
+        #                 "n": "get_last_url"
+        #             }],
+        #             "_type": "record"
+        #         }
+        #     },
+        #     "id": 1
+        # }
 
         sbis_auth = {
             "jsonrpc": "2.0",
@@ -91,15 +91,15 @@ header = {
     "Content-Type": "application/json; charset=utf-8",
     "X-SBISSessionID": auth_fix()}
 
-response = requests.post(standEndpoint, json=fastmenu_list(), headers=header).json()
+response = requests.post(standEndpoint, json=sale_create(4938), headers=header).json()
 # menu = response['result']['d']
 menu_list = {}
-
-for item in response['result']['d']:
-    key = item[19]
-    value = item[43]
-    menu_list[key] = value
-print(menu_list.keys())
+print(response['result'])
+# for item in response['result']['d']:
+#     key = item[19]
+#     value = item[43]
+#     menu_list[key] = value
+# print(menu_list.keys())
 # menus = [161, 159, 165, 163, 164, 158, 160, 162, 412, 418, 416, 409, 414, 411, 413, 420, 767, 763, 765, 771, 768, 772, 779, 776, 878, 861,
 #          864, 872, 634, 633, 636, 631, 632, 638, 630, 635, 637, 629, 3282, 3613]
 # memo = {11656: 'Осборн Солера Бренди', 11658: 'Вальдеспино Солера Бренди', 11659: 'Торрес 10 Гран Резерва Бренди',

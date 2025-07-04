@@ -1,3 +1,5 @@
+import uuid
+
 from kitchen_actions import *
 from typing import List
 from order_actions import delete_tables
@@ -69,22 +71,137 @@ async def pnq_actions() -> None:
 async def create_and_send_order(client: httpx.AsyncClient, table: int, index: int) -> None:
     try:
         # Создание продажи
-        sale_create_json = sale_create(table)
+        sale_create_json = {
+                "jsonrpc": "2.0",
+                "protocol": 6,
+                "method": "Sale.Create",
+                "params": {
+                    "Params": {
+                        "d": [
+                            Company,
+                            PriceList,
+                            0,
+                            {"product": product},
+                            "order",
+                            table,
+                            True
+                        ],
+                        "s": [
+                            {"t": "Число целое", "n": "Company"},
+                            {"t": "Число целое", "n": "PriceList"},
+                            {"t": "Число целое", "n": "Type"},
+                            {"t": "JSON-объект", "n": "Properties"},
+                            {"t": "Строка", "n": "Reglament"},
+                            {"t": "Число целое", "n": "Location"},
+                            {"t": "Логическое", "n": "ReturnSellerInfo"}
+                        ],
+                        "_type": "record",
+                        "f": 0
+                    }
+                },
+                "id": 1
+            }
         sale_response = await client.post(standEndpoint, json=sale_create_json, headers=header, timeout=REQUEST_TIMEOUT)
         sale_response.raise_for_status()
         sale_data = sale_response.json()
         sale = sale_data['result']['d'][0]
 
         # Добавление номенклатуры
-        nom = random.choice(menu)
-        sale_nomenclature_add_batch_json = salenomenclature_addbatch(sale, nomenclature=nom)
+        sale_nomenclature_add_batch_json = {
+                "jsonrpc": "2.0",
+                "protocol": 6,
+                "method": "SaleNomenclature.AddBatch",
+                "params": {
+                    "Options": {
+                        "skip_sale_check": True,
+                        "pay_type": 0,
+                        "skip_calories": True
+                    },
+                    "Sale": sale,
+                    "Batch": {
+                        "d": [
+                            [
+                                str(uuid.uuid4()),
+                                None,
+                                None,
+                                Nomenclature,
+                                None,
+                                CatalogPrice,
+                                Quantity,
+                                {
+                                    "type_ticket": None,
+                                    "origin_quantity": 1,
+                                    "skip_serial": None
+                                }
+                            ]
+                        ],
+                        "s": [
+                            {"t": "UUID", "n": "RecordKey"},
+                            {"t": "UUID", "n": "FolderKey"},
+                            {"t": "UUID", "n": "Key"},
+                            {"t": "Число целое", "n": "Nomenclature"},
+                            {"t": "Деньги", "n": "ManualPrice"},
+                            {"t": "Деньги", "n": "CatalogPrice"},
+                            {"t": "Число вещественное", "n": "Quantity"},
+                            {"t": "JSON-объект", "n": "Properties"}
+                        ],
+                        "_type": "recordset",
+                        "f": 0
+                    }
+                },
+                "id": 1
+            }
         add_response = await client.post(standEndpoint, headers=header, json=sale_nomenclature_add_batch_json, timeout=REQUEST_TIMEOUT)
         add_response.raise_for_status()
         add_data = add_response.json()
         sale_order = add_data["result"]["d"][0][1]
 
         # Отправка на кухню
-        kitchen_set_state_json = kitchen_setstate(sale_order, sale, table)
+        kitchen_set_state_json = {
+                "jsonrpc": "2.0",
+                "protocol": 6,
+                "method": "Kitchen.SetState",
+                "params": {
+                    "rec": {
+                        "d": [
+                            5,
+                            Warehouse,
+                            {
+                                "d": [
+                                    [
+                                        sale_order,
+                                        None,
+                                        None,
+                                        sale,
+                                        0
+                                    ]
+                                ],
+                                "s": [
+                                    {"t": "Число целое", "n": "SaleNomenclature"},
+                                    {"t": "Число целое", "n": "ProductionNomenclatureQueue"},
+                                    {"t": "Число целое", "n": "State"},
+                                    {"t": "Число целое", "n": "Sale"},
+                                    {"t": "Число целое", "n": "Priority"}
+                                ],
+                                "_type": "recordset",
+                                "f": 1
+                            },
+                            Company,
+                            table
+                        ],
+                        "s": [
+                            {"t": "Число целое", "n": "State"},
+                            {"t": "Число целое", "n": "Warehouse"},
+                            {"t": "Выборка", "n": "SaleNomenclatures"},
+                            {"t": "Число целое", "n": "Company"},
+                            {"t": "Число целое", "n": "Location"}
+                        ],
+                        "_type": "record",
+                        "f": 0
+                    }
+                },
+                "id": 1
+            }
         await client.post(standEndpoint, headers=header, json=kitchen_set_state_json, timeout=REQUEST_TIMEOUT)
         print(f"Заказ {index + 1} успешно обработан")
     except Exception as e:

@@ -1,7 +1,6 @@
 from auth import *
-from json_cal_methods import *
-import asyncio
-import httpx
+from config import *
+from datetime import datetime
 import time
 
 
@@ -17,12 +16,30 @@ async def async_post(client, json_data):
         print(f"Request error: {str(e)}")
         return None
 
+
 async def set_pnq_state(state):
     start_time = time.time()
     async with httpx.AsyncClient(headers=header) as client:
         tasks = []
         for pnq in pnq_list:
-            pnq_set_state_json = set_pnq_state(pnq=pnq, state=state)
+            pnq_set_state_json = {
+                "jsonrpc": "2.0",
+                "protocol": 6,
+                "method": "ProductionNomenclatureQueue.SetState",
+                "params": {
+                    "Param": {
+                        "d": [[Company], [pnq], state],
+                        "s": [
+                            {"t": {"n": "Массив", "t": "Число целое"}, "n": "Companies"},
+                            {"t": {"n": "Массив", "t": "Число целое"}, "n": "ProductionNomenclatureQueues"},
+                            {"t": "Число целое", "n": "State"}
+                        ],
+                        "_type": "record",
+                        "f": 0
+                    }
+                },
+                "id": 1
+            }
             tasks.append(async_post(client, pnq_set_state_json))
 
         await asyncio.gather(*tasks)
@@ -36,18 +53,52 @@ async def set_pnq_state(state):
     }.get(state, "")
     print(f"Все заказы отмечены {state_name} за {elapsed_time} сек.")
 
+
 async def check_ready():
     await set_pnq_state(10)
+
 
 async def check_served():
     await set_pnq_state(15)
     # await verify_empty_kitchen()
 
+
 async def check_in_work():
     await set_pnq_state(5)
 
+
 async def verify_empty_kitchen():
-    task_list_json = kitchen_task_list()
+    current_date = datetime.now().date()
+    task_list_json = {
+        "jsonrpc": "2.0",
+        "protocol": 6,
+        "method": "Kitchen.TaskList",
+        "params": {
+            "Фильтр": {
+                "d": [False, Company, True, "in_work",
+                      [str(current_date), str(current_date)],
+                      [None], None, True, [0, 5, 10], [Warehouse]],
+                "s": [
+                    {"t": "Логическое", "n": "ByNomenclature"},
+                    {"t": "Число целое", "n": "Company"},
+                    {"t": "Логическое", "n": "IsOnline"},
+                    {"t": "Строка", "n": "Mode"},
+                    {"t": {"n": "Массив", "t": "Дата"}, "n": "Period"},
+                    {"t": {"n": "Массив", "t": "Строка"}, "n": "ProductionSites"},
+                    {"t": "Строка", "n": "Search"},
+                    {"t": "Логическое", "n": "ShowDelivery"},
+                    {"t": {"n": "Массив", "t": "Число целое"}, "n": "States"},
+                    {"t": {"n": "Массив", "t": "Число целое"}, "n": "Warehouses"}
+                ],
+                "_type": "record",
+                "f": 0
+            },
+            "Сортировка": {"d": [[False, "Started", True]]},
+            "Навигация": {"d": [True, 999, 0]},
+            "ДопПоля": []
+        },
+        "id": 1
+    }
 
     async with httpx.AsyncClient(headers=header) as client:
         response = await async_post(client, task_list_json)
@@ -55,9 +106,56 @@ async def verify_empty_kitchen():
             av = [row[18] for row in response['result']['d']]
             assert len(av) == 0, "На кухне остались блюда"
 
-async def get_pnq_list():
 
-    data = kitchen_task_list()
+async def get_pnq_list():
+    current_date = datetime.now().date()
+
+    data = {
+        "jsonrpc": "2.0",
+        "protocol": 6,
+        "method": "Kitchen.TaskList",
+        "params": {
+            "Фильтр": {
+                "d": [False, Company, True, "in_work", [str(current_date), str(current_date)], [None], None, True, [0, 5, 10], [Warehouse]],
+                "s": [
+                    {"t": "Логическое", "n": "ByNomenclature"},
+                    {"t": "Число целое", "n": "Company"},
+                    {"t": "Логическое", "n": "IsOnline"},
+                    {"t": "Строка", "n": "Mode"},
+                    {"t": {"n": "Массив", "t": "Дата"}, "n": "Period"},
+                    {"t": {"n": "Массив", "t": "Строка"}, "n": "ProductionSites"},
+                    {"t": "Строка", "n": "Search"},
+                    {"t": "Логическое", "n": "ShowDelivery"},
+                    {"t": {"n": "Массив", "t": "Число целое"}, "n": "States"},
+                    {"t": {"n": "Массив", "t": "Число целое"}, "n": "Warehouses"}
+                ],
+                "_type": "record",
+                "f": 0
+            },
+            "Сортировка": {
+                "d": [[False, "Started", True]],
+                "s": [
+                    {"t": "Логическое", "n": "l"},
+                    {"t": "Строка", "n": "n"},
+                    {"t": "Логическое", "n": "o"}
+                ],
+                "_type": "recordset",
+                "f": 0
+            },
+            "Навигация": {
+                "d": [True, 999, 0],
+                "s": [
+                    {"t": "Логическое", "n": "ЕстьЕще"},
+                    {"t": "Число целое", "n": "РазмерСтраницы"},
+                    {"t": "Число целое", "n": "Страница"}
+                ],
+                "_type": "record",
+                "f": 0
+            },
+            "ДопПоля": []
+        },
+        "id": 1
+        }
 
     async with httpx.AsyncClient(headers=header) as client:
         try:
