@@ -3,8 +3,8 @@ from datetime import time as dt_time
 "Данные по авторизации стенд, логин и пароль"
 authEndpoint = "https://fix-sso.sbis.ru/auth/service/"
 standEndpoint = "https://fix-online.sbis.ru/service/"
-user = 'dp_sp11_96'
-password = '1108Denis@'
+user = ''
+password = ''
 
 # authEndpoint = "http://127.0.0.1:7071/auth/service/"
 # standEndpoint = "http://127.0.0.1:7071/PrestoOffline/service/"
